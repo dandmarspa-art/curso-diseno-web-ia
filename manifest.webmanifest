@@ -1,0 +1,14 @@
+{
+  "name": "Diseño y Web con IA",
+  "short_name": "Diseño y Web",
+  "description": "Curso intermedio en español: diseño gráfico y páginas web con IA, usando la voz.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf8ff",
+  "theme_color": "#6b3fb8",
+  "icons": [
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
