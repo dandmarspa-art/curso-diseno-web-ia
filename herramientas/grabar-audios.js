@@ -90,14 +90,27 @@ for (const [genero, modelo] of Object.entries(VOCES)) {
   console.log(`Voz ${genero}: ${faltan.length} audios por grabar.`);
   if (faltan.length) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'curso-voz-'));
-    const entrada = faltan.map(t => JSON.stringify({ text: paraLeer(t.texto), output_file: path.join(tmp, t.huella + '.wav') })).join('\n') + '\n';
-    const r = spawnSync(path.join(PIPER, 'piper.exe'),
+    const linea = (t) => JSON.stringify({ text: paraLeer(t.texto), output_file: path.join(tmp, t.huella + '.wav') });
+    const piper = (lineas, salida) => spawnSync(path.join(PIPER, 'piper.exe'),
       ['--model', modelo, '--json-input', '--length_scale', '1.05', '--sentence_silence', '0.3'],
-      { input: entrada, stdio: ['pipe', 'ignore', 'inherit'], maxBuffer: 1 << 26 });
-    if (r.status !== 0) throw new Error('Piper falló.');
+      { input: lineas.join('\n') + '\n', stdio: ['pipe', 'ignore', salida], maxBuffer: 1 << 26, encoding: 'utf8' });
+    const r = piper(faltan.map(linea), 'inherit');
+    if (r.status !== 0) {
+      // Una palabra rara hace fallar a Piper y corta todo: grabamos lo que quedó, de a un texto,
+      // y nos saltamos (avisando) los que fallen. Esos se leerán con la voz del aparato.
+      const quedan = faltan.filter(t => !fs.existsSync(path.join(tmp, t.huella + '.wav')));
+      console.warn(`Piper se detuvo. Grabando de a uno los ${quedan.length} que faltan...`);
+      for (const t of quedan) {
+        const r1 = piper([linea(t)], 'pipe');
+        if (r1.status !== 0) {
+          const error = (r1.stderr || '').split('\n').find(l => /error/i.test(l)) || '';
+          console.warn('  ❌ Falló:', JSON.stringify(t.texto.slice(0, 120)), error.replace(/^.*\[error\]\s*/, ''));
+        }
+      }
+    }
     for (const t of faltan) {
       const wav = path.join(tmp, t.huella + '.wav');
-      if (fs.existsSync(wav)) wavAMp3(wav, path.join(carpeta, t.huella + '.mp3'));
+      if (fs.existsSync(wav) && fs.statSync(wav).size > 100) wavAMp3(wav, path.join(carpeta, t.huella + '.mp3'));
       else console.warn('  No se grabó:', t.texto.slice(0, 60));
     }
     fs.rmSync(tmp, { recursive: true, force: true });
